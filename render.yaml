@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: nexus-exec-brain
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: ""
+    startCommand: node task_runner.mjs
+    healthCheckPath: /health
+    envVars:
+      - key: TASK_TOKEN
+        generateValue: true
