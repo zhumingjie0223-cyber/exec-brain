@@ -1,0 +1,33 @@
+# 神枢网卡执行脑 — Docker 路线（机器上已有 Docker 时用这个，比装 systemd 更省事）
+#
+#   cd deploy && TASK_TOKEN=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n') docker compose up -d
+#
+# 关键在 cap_add 与 /dev/net/tun：普通容器默认没有这两样，就拿不到真网卡。
+# 注意 network_mode: host —— 抓包要看到宿主机真实网卡，桥接网络里只能看到容器自己的虚拟网卡。
+services:
+  nic-brain:
+    image: node:20-bookworm-slim
+    container_name: nexus-nic-brain
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ../nic_runner.mjs:/app/nic_runner.mjs:ro
+    environment:
+      TASK_TOKEN: ${TASK_TOKEN:?请先设置 TASK_TOKEN 环境变量}
+      PORT: 8080
+    # 真网卡能力：抓包/原始套接字靠 NET_RAW，建虚拟网卡/改路由靠 NET_ADMIN
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    # 抓宿主机真实网卡必须用 host 网络；只想抓容器自己的流量可以去掉这行
+    network_mode: host
+    command: >
+      sh -c "apt-get update -qq && apt-get install -y -qq tcpdump traceroute iproute2 iputils-ping >/dev/null &&
+             node /app/nic_runner.mjs"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

@@ -1,0 +1,26 @@
+name: 执行脑测试
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # runner 上装齐网卡工具，好让抓包/ping 这些走真路径而不是走"未安装"分支
+      - name: 装网卡工具
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq tcpdump traceroute iputils-ping
+      - name: 语法检查
+        run: |
+          node --check task_runner.mjs
+          node --check nic_runner.mjs
+          bash -n deploy/install.sh
+      - name: 网卡执行脑测试
+        run: node --test test/nic.test.mjs
